@@ -34,8 +34,10 @@ def _get_object_params(params):
 
 
 def setup(server, module):
-    from imcsdk.apis.admin.ldap import ldap_configure
-    from imcsdk.apis.admin.ldap import ldap_settings_exist
+    from imcsdk.apis.v2.admin.ldap import ldap_enable
+    from imcsdk.apis.v2.admin.ldap import ldap_disable
+    from imcsdk.apis.v2.admin.ldap import ldap_exists
+    from imcsdk.apis.v2.admin.ldap import is_ldap_enabled
 
     results = {}
     err = False
@@ -45,21 +47,21 @@ def setup(server, module):
 
         args = _get_object_params(ansible)
         if ansible['state'] == 'present':
-            exists, mo = ldap_settings_exist(handle=server,
-                                             enabled=True,
-                                             **args)
+            exists, mo = ldap_exists(handle=server,
+                                        admin_state='enabled',
+                                        **args)
             if module.check_mode or exists:
                 results["changed"] = not exists
                 return results, False
 
-            ldap_configure(handle=server, enabled=True, **args)
+            ldap_enable(handle=server, **args)
         elif ansible['state'] == 'absent':
-            exists, mo = ldap_settings_exist(handle=server, enabled=False)
-            if module.check_mode or exists:
-                results["changed"] = not exists
+            exists = is_ldap_enabled(handle=server)
+            if module.check_mode or not exists:
+                results["changed"] = (exists != False)
                 return results, False
 
-            ldap_configure(handle=server, enabled=False)
+            ldap_disable(handle=server)
 
         results['changed'] = True
 
@@ -77,19 +79,19 @@ def main():
         argument_spec=dict(
             basedn=dict(required=False),
             domain=dict(required=False),
-            encryption=dict(required=False, default=True, type='bool'),
+            encryption=dict(required=False, default='enabled', type='str'),
             timeout=dict(required=False, default=60, type='int'),
             user_search_precedence=dict(required=False),
             bind_method=dict(required=False, default='login-credentials', type='str'),
             bind_dn=dict(required=False),
-            ldap_password=dict(required=False),
+            ldap_password=dict(required=False, type='str', no_log=True),
             filter=dict(required=False, type='str'),
             attribute=dict(required=False, type='str'),
             group_attribute=dict(required=False, type='str'),
             group_nested_search=dict(required=False, type='str'),
-            group_auth=dict(required=False, default=False, type='bool'),
+            group_auth=dict(required=False, type='str'),
             ldap_servers=dict(required=False, type='list'),
-            locate_directory_using_dns=dict(required=False, default=False, type='bool'),
+            locate_directory_using_dns=dict(required=False, type='str'),  # yes or no
             dns_domain_source=dict(required=False, default='extracted-domain', type='str'),
             dns_search_domain=dict(required=False),
             dns_search_forest=dict(required=False),
